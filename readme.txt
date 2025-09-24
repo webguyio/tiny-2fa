@@ -16,7 +16,7 @@ A simple two-factor authentication plugin that just works.
 
 This is probably the 2FA plugin you're looking for.
 
-Secure, private, and lightweight.
+Secure, private, and *lightweight*.
 
 Integrates into WordPress like a native feature.
 
@@ -30,6 +30,10 @@ Integrates into WordPress like a native feature.
 6. Once successful login with a 2FA code from your app has been confirmed, you should disable Backup Codes
 
 Backup Codes have been rethought from the usual method you might be used to. Read more about that in the FAQ below.
+
+= Need Support? =
+
+Ask for help [here](https://github.com/webguyio/tiny-2fa/issues).
 
 == Installation ==
 
@@ -54,6 +58,15 @@ Backup Codes have been rethought from the usual method you might be used to. Rea
 Try not to panic; you're not permanently locked out and nothing has been lost. You'll simply need to disable the Tiny 2FA plugin to regain access.
 
 The simplest way to do that is to access your */wp-content/plugins* folder via FTP and rename the */tiny-2fa* folder to anything else. Once you're back in your admin, you can restore the folder name and proceed to adjust your 2FA settings.
+
+= I'm positive I entered my username, password, and 2FA code correctly, but I still can't log in! =
+
+There are a few quirks to check for that could disrupt the general 2FA process, which aren't exclusive to Tiny 2FA:
+
+1. The code you're trying to enter may have expired. Even if you get a fresh code, you may need to reload the login page again first before trying the new code.
+2. You may need to clear the browser cache and try again.
+3. If you're using a caching plugin, make sure it doesn't cache login pages or otherwise exclude your login page in its settings.
+4. In your authenticator app, you may need to find and use a setting called something like "Sync Clock with Google."
 
 = What 2FA methods are available? =
 
