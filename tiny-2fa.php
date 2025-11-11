@@ -3,7 +3,7 @@
 Plugin Name: Tiny 2FA
 Plugin URI: https://github.com/webguyio/tiny-2fa
 Description: A simple two-factor authentication plugin that just works.
-Version: 0.1
+Version: 0.2
 Requires at least: 5.0
 Requires PHP: 7.4
 Author: Web Guy
@@ -26,8 +26,10 @@ class Tiny_2FA {
 		add_action( 'edit_user_profile', array( $this, 'tiny_2fa_render_profile_fields' ) );
 		add_action( 'personal_options_update', array( $this, 'tiny_2fa_save_profile_settings' ) );
 		add_action( 'edit_user_profile_update', array( $this, 'tiny_2fa_save_profile_settings' ) );
-		add_filter( 'authenticate', array( $this, 'tiny_2fa_validate_login' ), 30, 3 );
 		add_action( 'login_form', array( $this, 'tiny_2fa_render_login_field' ) );
+		add_action( 'wp_login', array( $this, 'tiny_2fa_clear_login_attempts' ), 10, 2 );
+		add_filter( 'authenticate', array( $this, 'tiny_2fa_check_brute_force' ), 20, 3 );
+		add_filter( 'authenticate', array( $this, 'tiny_2fa_validate_login' ), 30, 3 );
 		$this->tiny_2fa_encryption_key = $this->tiny_2fa_get_encryption_key();
 	}
 
@@ -117,11 +119,47 @@ class Tiny_2FA {
 		return false;
 	}
 
+	public function tiny_2fa_check_brute_force( $user, $username, $password ) {
+		if ( empty( $username ) || empty( $password ) ) {
+			return $user;
+		}
+		$brute_force_enabled = get_site_option( 'tiny_2fa_brute_force_enabled', '1' );
+		if ( $brute_force_enabled !== '1' ) {
+			return $user;
+		}
+		$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+		$transient_key = 'login_attempts_' . md5( $ip );
+		$attempts = get_transient( $transient_key );
+		if ( !$attempts ) {
+			$attempts = array();
+		}
+		$current_time = time();
+		$attempts = array_filter( $attempts, function( $timestamp ) use ( $current_time ) {
+			return ( $current_time - $timestamp ) < DAY_IN_SECONDS;
+		} );
+		if ( count( $attempts ) >= 10 ) {
+			return new WP_Error( 'too_many_attempts', __( 'Too many failed login attempts. Please try again later.', 'tiny-2fa' ) );
+		}
+		if ( is_wp_error( $user ) ) {
+			$attempts[] = $current_time;
+			set_transient( $transient_key, $attempts, DAY_IN_SECONDS );
+		}
+		return $user;
+	}
+
+	public function tiny_2fa_clear_login_attempts( $user_login, $user ) {
+		$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+		$transient_key = 'login_attempts_' . md5( $ip );
+		delete_transient( $transient_key );
+	}
+
 	public function tiny_2fa_render_profile_fields( $user ) {
 		if ( !current_user_can( 'edit_user', $user->ID ) ) {
 			return;
 		}
 		wp_nonce_field( 'tiny_2fa_profile_nonce', 'tiny_2fa_profile_nonce' );
+		$is_admin = current_user_can( 'manage_options' );
+		$brute_force_enabled = get_site_option( 'tiny_2fa_brute_force_enabled', '1' );
 		$two_factor_enabled = get_user_meta( $user->ID, 'tiny_2fa_enabled', true );
 		$two_factor_email_enabled = get_user_meta( $user->ID, 'tiny_2fa_email_enabled', true );
 		$two_factor_email_enabled = $two_factor_email_enabled === '' ? '1' : $two_factor_email_enabled;
@@ -152,6 +190,13 @@ class Tiny_2FA {
 					<?php esc_html_e( 'Scan QR code or manually enter the secret key into your authenticator app.', 'tiny-2fa' ); ?></td>
 				</tr>
 			<?php endif; ?>
+			<?php if ( $is_admin ) : ?>
+			<tr>
+				<th><label for="tiny_2fa_brute_force_enabled"><?php esc_html_e( 'Brute Force Protection', 'tiny-2fa' ); ?></label></th>
+				<td><label><input type="checkbox" name="tiny_2fa_brute_force_enabled" id="tiny_2fa_brute_force_enabled" value="1" <?php checked( $brute_force_enabled, '1' ); ?>>
+				<?php esc_html_e( 'Enable brute force protection (blocks IPs after 10 failed login attempts for 24 hours).', 'tiny-2fa' ); ?></label></td>
+			</tr>
+			<?php endif; ?>
 		</table>
 		<?php
 	}
@@ -162,6 +207,10 @@ class Tiny_2FA {
 		}
 		if ( !current_user_can( 'edit_user', $user_id ) ) {
 			return;
+		}
+		if ( current_user_can( 'manage_options' ) ) {
+			$brute_force_enabled = isset( $_POST['tiny_2fa_brute_force_enabled'] ) ? '1' : '0';
+			update_site_option( 'tiny_2fa_brute_force_enabled', $brute_force_enabled );
 		}
 		$previous_2fa_status = get_user_meta( $user_id, 'tiny_2fa_enabled', true );
 		$two_factor_enabled = isset( $_POST['tiny_2fa_enabled'] ) ? '1' : '0';
@@ -178,7 +227,7 @@ class Tiny_2FA {
 			} );
 		}
 		if ( !$two_factor_enabled ) {
-		delete_user_meta( $user_id, 'tiny_2fa_secret_key' );
+			delete_user_meta( $user_id, 'tiny_2fa_secret_key' );
 		}
 	}
 
@@ -215,6 +264,18 @@ class Tiny_2FA {
 			$this->tiny_2fa_send_email( $user, $calculated_code );
 		}
 		if ( !$this->tiny_2fa_verify_totp_code( $secret_key, $submitted_code ) ) {
+			$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+			$transient_key = 'login_attempts_' . md5( $ip );
+			$attempts = get_transient( $transient_key );
+			if ( !$attempts ) {
+				$attempts = array();
+			}
+			$current_time = time();
+			$attempts = array_filter( $attempts, function( $timestamp ) use ( $current_time ) {
+				return ( $current_time - $timestamp ) < DAY_IN_SECONDS;
+			} );
+			$attempts[] = $current_time;
+			set_transient( $transient_key, $attempts, DAY_IN_SECONDS );
 			return new WP_Error( 'invalid_2fa_code', __( 'Invalid two-factor authentication code.', 'tiny-2fa' ) );
 		}
 		return $user;

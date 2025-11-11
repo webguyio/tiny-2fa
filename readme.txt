@@ -1,4 +1,4 @@
-=== Tiny 2FA ===
+=== Tiny 2FA + Brute Force Protection ===
 
 Contributors: webguyio
 Donate link: https://webguy.io/donate
@@ -6,7 +6,7 @@ Tags: 2fa, mfa, security, login
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.1
+Stable tag: 0.2
 License: CC0
 License URI: https://creativecommons.org/public-domain/cc0/
 
@@ -20,6 +20,10 @@ Secure, private, and *lightweight*.
 
 Integrates into WordPress like a native feature.
 
+= Proactive vs Reactive Security =
+
+Prevents attacks instead of reacting to them. The best breach is the one that never happens.
+
 = How it Works =
 
 1. Install and activate the plugin
@@ -28,6 +32,7 @@ Integrates into WordPress like a native feature.
 4. 2FA and Backup Codes are now enabled
 5. Scan the QR code or manually enter the secret key into your auth app of choice (and be sure to rename the generic site name "2FA" to something more useful)
 6. Once successful login with a 2FA code from your app has been confirmed, you should disable Backup Codes
+7. Brute force protection is enabled by default and can be managed site-wide by admins in profile settings
 
 Backup Codes have been rethought from the usual method you might be used to. Read more about that in the FAQ below.
 
@@ -65,8 +70,9 @@ There are a few quirks to check for that could disrupt the general 2FA process, 
 
 1. The code you're trying to enter may have expired. Even if you get a fresh code, you may need to reload the login page again first before trying the new code.
 2. You may need to clear the browser cache and try again.
-3. If you're using a caching plugin, make sure it doesn't cache login pages or otherwise exclude your login page in its settings.
-4. In your authenticator app, you may need to find and use a setting called something like "Sync Clock with Google."
+3. If you're using Cloudflare, you'll need to either [restore visitor IPs](https://developers.cloudflare.com/support/troubleshooting/restoring-visitor-ips/restoring-original-visitor-ips/) or disable brute force protection.
+4. If you're using a caching plugin, make sure it doesn't cache login pages or otherwise exclude your login page in its settings.
+5. In your authenticator app, you may need to find and use a setting called something like "Sync Clock with Google."
 
 = What 2FA methods are available? =
 
@@ -105,6 +111,9 @@ I think I've been able to improve upon the concept of Backup Codes, at least in 
 I'm open to being wrong about this. If you feel my thinking is flawed or you have any other suggestion for improving the security of Tiny 2FA, please let me know.
 
 == Changelog ==
+
+= 0.2 =
+* Added brute force protection
 
 = 0.1 =
 * New
