@@ -6,7 +6,7 @@ Tags: 2fa, mfa, security, login
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.2
+Stable tag: 0.3
 License: CC0
 License URI: https://creativecommons.org/public-domain/cc0/
 
@@ -84,7 +84,15 @@ There are many mobile, desktop, and browser apps that support TOTP, including: G
 
 = How do I generate a new secret key? =
 
-Simply disable and re-enable 2FA in your profile settings to get a new key.
+Simply regenerate (↻) in your profile settings to get a new key.
+
+= Can I store the site encryption key in wp-config.php? =
+
+Yes. For extra security, you can define your encryption key in wp-config.php:
+
+`define( 'TINY_2FA_ENCRYPTION_KEY', 'your-64-character-hex-key-here' );`
+
+You can find your current key in */wp-content/tiny-2fa-backup.php*. This ensures your key survives database issues if somehow it's lost.
 
 = How's the security? =
 
@@ -111,6 +119,11 @@ I think I've been able to improve upon the concept of Backup Codes, at least in 
 I'm open to being wrong about this. If you feel my thinking is flawed or you have any other suggestion for improving the security of Tiny 2FA, please let me know.
 
 == Changelog ==
+
+= 0.3 =
+* Ability to set custom encryption key
+* Switched to Sodium encryption (XChaCha20-Poly1305)
+* Improved safety checks
 
 = 0.2 =
 * Added brute force protection
