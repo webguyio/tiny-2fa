@@ -3,9 +3,9 @@
 Plugin Name: Tiny 2FA
 Plugin URI: https://github.com/webguyio/tiny-2fa
 Description: A simple two-factor authentication plugin that just works.
-Version: 0.3
-Requires at least: 5.0
-Requires PHP: 7.4
+Version: 0.4
+Requires at least: 6.0
+Requires PHP: 8.0
 Author: Web Guy
 Author URI: https://webguy.io/
 License: CC0
@@ -27,7 +27,6 @@ class Tiny_2FA {
 
 	public function __construct() {
 		// Initialization
-		add_action( 'plugins_loaded', array( $this, 'tiny_2fa_maybe_migrate' ) );
 		$this->tiny_2fa_encryption_key = $this->tiny_2fa_get_encryption_key();
 		// User Profile & Settings
 		add_action( 'show_user_profile', array( $this, 'tiny_2fa_render_profile_fields' ) );
@@ -43,38 +42,6 @@ class Tiny_2FA {
 		add_action( 'wp_login', array( $this, 'tiny_2fa_clear_login_attempts' ), 10, 2 );
 	}
 
-	public function tiny_2fa_maybe_migrate() {
-		$plugin_data = get_file_data( __FILE__, array( 'Version' => 'Version' ) );
-		$current_version = $plugin_data['Version'];
-		$installed_version = get_site_option( 'tiny_2fa_version', '0.0' );
-		if ( version_compare( $installed_version, '0.3', '<' ) ) {
-			$hex_key = get_site_option( 'tiny_2fa_encryption_key' );
-			if ( $hex_key ) {
-				$binary_key = hex2bin( $hex_key );
-				$users = get_users( array( 'meta_key' => 'tiny_2fa_secret_key' ) );
-				foreach ( $users as $user ) {
-					$old_encrypted = get_user_meta( $user->ID, 'tiny_2fa_secret_key', true );
-					if ( empty( $old_encrypted ) ) {
-						continue;
-					}
-					$decoded = base64_decode( $old_encrypted );
-					$nonce = substr( $decoded, 0, 12 );
-					$tag = substr( $decoded, 12, 16 );
-					$ciphertext = substr( $decoded, 28 );
-					$secret = openssl_decrypt( $ciphertext, 'aes-256-gcm', $hex_key, OPENSSL_RAW_DATA, $nonce, $tag );
-					if ( $secret === false ) {
-						continue;
-					}
-					$new_nonce = random_bytes( SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES );
-					$new_encrypted = sodium_crypto_aead_xchacha20poly1305_ietf_encrypt( $secret, '', $new_nonce, $binary_key );
-					$new_encoded = base64_encode( $new_nonce . $new_encrypted );
-					update_user_meta( $user->ID, 'tiny_2fa_secret_key', $new_encoded );
-				}
-			}
-		}
-		update_site_option( 'tiny_2fa_version', $current_version );
-	}
-
 	// ========================================
 	// ENCRYPTION KEY MANAGEMENT
 	// ========================================
@@ -83,7 +50,7 @@ class Tiny_2FA {
 		$file_path = WP_CONTENT_DIR . '/tiny-2fa-backup.php';
 		if ( $action === 'save' && $key ) {
 			$content = "<?php\n// Tiny 2FA Encryption Key Backup\n// Do not edit or delete this file\nif ( !defined( 'ABSPATH' ) ) { exit; }\nreturn '" . $key . "';\n";
-			return file_put_contents( $file_path, $content, LOCK_EX ) !== false;
+			return file_put_contents( $file_path, $content, LOCK_EX ) !== false; // phpcs:ignore PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- Intentionally writing to WP_CONTENT_DIR, not the plugin folder.
 		}
 		if ( $action === 'load' && file_exists( $file_path ) ) {
 			return include $file_path;
@@ -202,7 +169,7 @@ class Tiny_2FA {
 			( ( ord( $hmac[ $offset + 2 ] ) & 0xff ) << 8 ) |
 			( ord( $hmac[ $offset + 3 ] ) & 0xff )
 		);
-		return substr( (string) ( $code % 1000000 ), -6, 6 );
+		return str_pad( (string) ( $code % 1000000 ), 6, '0', STR_PAD_LEFT );
 	}
 
 	private function tiny_2fa_verify_totp_code( $secret, $code ) {
@@ -356,10 +323,11 @@ class Tiny_2FA {
 		if ( !wp_check_password( $password, $user->user_pass, $user->ID ) ) {
 			return $user;
 		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Login form nonce verification is handled by WordPress core.
 		if ( !isset( $_POST['user_2fa'] ) ) {
 			return new WP_Error( 'two_factor_required', __( 'Two-factor authentication code is required.', 'tiny-2fa' ) );
 		}
-		$submitted_code = sanitize_text_field( wp_unslash( $_POST['user_2fa'] ) );
+		$submitted_code = sanitize_text_field( wp_unslash( $_POST['user_2fa'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Login form nonce verification is handled by WordPress core.
 		$encrypted_secret_key = get_user_meta( $user->ID, 'tiny_2fa_secret_key', true );
 		$secret_key = $this->tiny_2fa_decrypt_secret_key( $encrypted_secret_key );
 		if ( $secret_key === false ) {

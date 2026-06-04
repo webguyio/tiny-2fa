@@ -2,17 +2,19 @@
 
 Contributors: webguyio
 Donate link: https://webguy.io/donate
-Tags: 2fa, mfa, security, login
-Requires at least: 5.0
-Tested up to: 6.8
-Requires PHP: 7.4
-Stable tag: 0.3
+Tags: 2fa, mfa, security, login, account
+Requires at least: 6.0
+Tested up to: 7.0
+Requires PHP: 8.0
+Stable tag: 0.4
 License: CC0
 License URI: https://creativecommons.org/public-domain/cc0/
 
 A simple two-factor authentication plugin that just works.
 
 == Description ==
+
+[💬 Ask Question](https://github.com/webguyio/tiny-2fa/issues) | [📧 Email Me](mailto:webguywork@gmail.com)
 
 This is probably the 2FA plugin you're looking for.
 
@@ -119,6 +121,9 @@ I think I've been able to improve upon the concept of Backup Codes, at least in 
 I'm open to being wrong about this. If you feel my thinking is flawed or you have any other suggestion for improving the security of Tiny 2FA, please let me know.
 
 == Changelog ==
+
+= 0.4 =
+* Improved handling of 0s in passcode
 
 = 0.3 =
 * Ability to set custom encryption key
